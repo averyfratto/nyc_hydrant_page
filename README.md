@@ -1,4 +1,5 @@
 # NYC Hydrant Density Map
+The site is live at https://averyfratto.github.io/nyc_hydrant_page/. 
 
 This project maps fire hydrants across New York City's neighborhoods. Click a neighborhood to see its hydrant count and the values behind its color, and hover to outline it.
 
