@@ -58,7 +58,7 @@ python3 -m http.server 8000
 
 ## What I learned
 
-[Two or three sentences. What was harder than expected? What design decision took the most iterations? What would you do differently? This is the part hiring managers actually read.]
+The hardest part of this project was learning about structuring and designing html files. More then just making sure a map loads/is correct, what makes a site intuitive? Easy to understand? Engaging? Learning about all the different ways you get creative with fonts, backgrounds, designs, and themes was really fun- but also challenging. In the future, I want to learn more aobut building multiple connecting pages, and having more embedded content. 
 
 ## Stack
 
