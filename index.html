@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NYC Hydrant Density by Neighborhood</title>
+    <script>document.documentElement.className = 'js';</script>
+
+    <!-- Fonts: Bungee (signage-style headings) + DM Sans (body) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Bungee&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+
+    <!-- MapLibre GL JS -->
+    <link href="https://cdn.jsdelivr.net/npm/maplibre-gl@5.21.0/dist/maplibre-gl.css" rel="stylesheet" />
+    <script src="https://cdn.jsdelivr.net/npm/maplibre-gl@5.21.0/dist/maplibre-gl.js"></script>
+
+    <!-- PMTiles protocol plugin — lets MapLibre read .pmtiles files directly -->
+    <script src="https://cdn.jsdelivr.net/npm/pmtiles@4.4.0/dist/pmtiles.js"></script>
+
+    <style>
+        :root {
+            --red: #d62828; --blue: #0039a6; --purple: #5b2a96;
+            --yellow: #ffc72c; --cream: #f6f0e3; --ink: #111;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font: 18px/1.65 "DM Sans", system-ui, sans-serif; color: var(--ink); background: var(--cream); }
+        h1, h2 { font-family: Bungee, Impact, sans-serif; font-weight: 400; line-height: 1.05; }
+
+        /* ── Hero: night skyline, spraying hydrant, street ── */
+        .hero { position: relative; overflow: hidden; color: #fff; padding-top: 56px;
+                background: linear-gradient(#0a1633 0%, #1f3a8a 60%, #f08a4b 100%); }
+        .hero-inner { position: relative; z-index: 2; max-width: 1100px; margin: 0 auto; padding: 0 20px;
+                      display: grid; grid-template-columns: 1.25fr 1fr; align-items: end; min-height: 470px; }
+        .hero-text { align-self: start; padding-bottom: 140px; }
+        .pill { display: inline-block; background: var(--yellow); color: var(--ink); font-weight: 700; font-size: 13px;
+                letter-spacing: .12em; text-transform: uppercase; padding: 6px 14px; border-radius: 99px; margin-bottom: 18px; }
+        .hero h1 { font-size: clamp(34px, 6vw, 72px); color: var(--yellow); text-shadow: 4px 4px 0 var(--red); text-transform: uppercase; }
+        .lede { font-size: clamp(18px, 2.2vw, 24px); max-width: 30ch; margin-top: 18px; }
+        .hydrant { display: block; width: 100%; max-width: 440px; justify-self: center; }
+        #skyline { position: absolute; z-index: 1; left: 0; bottom: 26px; width: 100%; height: max(180px, 21.3vw); }
+        .win { fill: #ffd86b; opacity: .15; animation: tw 4s ease-in-out infinite; }
+        .beacon { fill: #ff4d4d; animation: tw 1.6s ease-in-out infinite; }
+        @keyframes tw { 0%, 100% { opacity: .1; } 50% { opacity: 1; } }
+        .jet  { fill: none; stroke: #8fdcff; stroke-width: 5; stroke-linecap: round; stroke-dasharray: 1 15; animation: flow 1s linear infinite; }
+        .jet2 { fill: none; stroke: #bfeaff; stroke-opacity: .45; stroke-width: 9; stroke-linecap: round; stroke-dasharray: 10 6; animation: flow 1s linear infinite; }
+        @keyframes flow { to { stroke-dashoffset: -160; } }
+        .road { position: relative; z-index: 3; height: 26px; border-top: 4px solid #666;
+                background: linear-gradient(90deg, var(--yellow) 0 30px, transparent 30px 70px) 0 60%/70px 4px repeat-x, #1b1b1b;
+                animation: road 1.2s linear infinite; }
+        @keyframes road { to { background-position: -70px 60%; } }
+
+        /* ── Ticker ── */
+        .ticker { background: var(--ink); color: var(--yellow); overflow: hidden; white-space: nowrap;
+                  font: 18px Bungee, Impact, sans-serif; text-transform: uppercase; padding: 10px 0; border-block: 4px solid var(--red); }
+        .ticker div { display: inline-block; animation: marq 30s linear infinite; }
+        @keyframes marq { to { transform: translateX(-50%); } }
+
+        /* ── About: subway-tile wall + sticker card ── */
+        .about { padding: 64px 20px; background-color: #efe9dc;
+                 background-image: linear-gradient(#cfc7b4 2px, transparent 2px), linear-gradient(90deg, #cfc7b4 2px, transparent 2px);
+                 background-size: 60px 30px; }
+        .card { max-width: 780px; margin: 0 auto; background: #fff; border: 4px solid var(--ink); border-radius: 6px;
+                box-shadow: 10px 10px 0 var(--red); padding: 36px; }
+        .card p { margin-bottom: 16px; }
+        .card p:last-child { margin-bottom: 0; }
+        .about h2 { display: inline-block; background: var(--ink); color: #fff; padding: 6px 16px; border-radius: 6px;
+                    font-size: 28px; margin-bottom: 22px; transform: rotate(-2deg); }
+
+        /* ── Map intros: colored to match each map, with subway-style bullets ── */
+        .intro { padding: 56px 20px 40px; color: #fff; }
+        .intro.red { background: var(--red); --c: var(--red); }
+        .intro.blue { background: var(--blue); --c: var(--blue); }
+        .intro.purple { background: var(--purple); --c: var(--purple); }
+        .intro .wrap { max-width: 780px; margin: 0 auto; display: grid; grid-template-columns: auto 1fr; gap: 24px; align-items: center; }
+        .intro h2 { font-size: clamp(26px, 4.5vw, 44px); color: var(--yellow); margin-bottom: 10px; }
+        .bullet { width: 76px; height: 76px; border-radius: 50%; background: #fff; color: var(--c); border: 4px solid var(--ink);
+                  display: grid; place-items: center; font: 44px/1 Bungee, Impact, sans-serif; }
+
+        /* ── Maps ── */
+        .map-wrapper { position: relative; width: 100%; height: 70vh; min-height: 420px; border-bottom: 14px solid var(--c); }
+        .map { width: 100%; height: 100%; }
+        .legend { position: absolute; bottom: 30px; left: 10px; background: white; padding: 12px 14px; border-radius: 6px;
+                  box-shadow: 0 1px 4px rgba(0,0,0,0.3); font-size: 13px; z-index: 1; line-height: 1.5; }
+        .legend h4 { margin: 0 0 8px; font: 12px Bungee, Impact, sans-serif; }
+        .legend-row { display: flex; align-items: center; margin-bottom: 3px; }
+        .legend-color { width: 20px; height: 14px; margin-right: 8px; border-radius: 2px; border: 1px solid rgba(0,0,0,0.1); }
+        .info { position: absolute; top: 10px; left: 10px; background: white; padding: 10px 14px; border-radius: 6px;
+                box-shadow: 0 1px 4px rgba(0,0,0,0.3); font-size: 13px; line-height: 1.5; z-index: 1; max-width: 280px; }
+        .info h3 { margin: 0 0 4px; font: 14px Bungee, Impact, sans-serif; }
+        .info p { margin: 0; color: #555; }
+
+        /* ── Sources: taxi yellow with checker band ── */
+        .sources { background: var(--yellow); padding-bottom: 64px; }
+        .sources::before { content: ""; display: block; height: 28px; margin-bottom: 48px;
+                           background: repeating-conic-gradient(#111 0 25%, #fff 0 50%) 0 0/28px 28px; }
+        .sources .wrap { max-width: 780px; margin: 0 auto; padding: 0 20px; }
+        .sources h2 { font-size: clamp(32px, 6vw, 52px); margin-bottom: 24px; }
+        .sources ul { list-style: none; }
+        .sources li { background: #fff; border: 3px solid var(--ink); border-radius: 6px; box-shadow: 5px 5px 0 var(--ink);
+                      padding: 12px 16px; margin-bottom: 14px; }
+        .sources a { color: var(--ink); font-weight: 700; text-underline-offset: 3px; text-decoration-thickness: 3px; }
+        .sources a:hover { background: var(--ink); color: var(--yellow); }
+
+        /* ── Scroll reveal ── */
+        .js .reveal { opacity: 0; transform: translateY(28px); transition: opacity .6s, transform .6s; }
+        .js .reveal.in { opacity: 1; transform: none; }
+
+        @media (max-width: 760px) {
+            .hero-inner { grid-template-columns: 1fr; }
+            .hero-text { padding-bottom: 10px; }
+            .hydrant { max-width: 300px; }
+            .card { padding: 24px; box-shadow: 6px 6px 0 var(--red); }
+            .bullet { width: 56px; height: 56px; font-size: 32px; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            * { animation: none !important; transition: none !important; }
+            .js .reveal { opacity: 1; transform: none; }
+            .win { opacity: .7; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- ═══════════════════════════ HERO ═══════════════════════════ -->
+<header class="hero">
+    <svg id="skyline" viewBox="-200 -80 1600 340" preserveAspectRatio="xMidYMax slice" aria-hidden="true"></svg>
+    <div class="hero-inner">
+        <div class="hero-text">
+            <span class="pill">Fire hydrants × New York City</span>
+            <h1>NYC Hydrant Density by Neighborhood</h1>
+            <p class="lede">Three ways to count the city's hydrants, one neighborhood at a time.</p>
+        </div>
+        <svg class="hydrant" viewBox="0 0 400 260" role="img" aria-label="A fire hydrant spraying water">
+            <path class="jet2" d="M124 153Q60 30 8 215"/><path class="jet" d="M124 153Q60 30 8 215"/>
+            <path class="jet2" d="M276 153Q340 30 392 215"/><path class="jet" d="M276 153Q340 30 392 215"/>
+            <g transform="translate(90 0)">
+                <rect x="40" y="234" width="140" height="22" rx="4" fill="#8b1717"/>
+                <rect x="50" y="222" width="120" height="14" rx="3" fill="#a31d1d"/>
+                <rect x="70" y="108" width="80" height="118" rx="8" fill="#d62828"/>
+                <path d="M70 110a40 40 0 0 1 80 0z" fill="#d62828"/>
+                <rect x="66" y="150" width="88" height="10" rx="3" fill="#a31d1d"/>
+                <rect x="98" y="56" width="24" height="18" rx="4" fill="#ffc72c"/>
+                <rect x="44" y="140" width="30" height="26" rx="4" fill="#d62828"/><rect x="34" y="136" width="14" height="34" rx="4" fill="#ffc72c"/>
+                <rect x="146" y="140" width="30" height="26" rx="4" fill="#d62828"/><rect x="172" y="136" width="14" height="34" rx="4" fill="#ffc72c"/>
+                <circle cx="110" cy="190" r="16" fill="#a31d1d"/><circle cx="110" cy="190" r="9" fill="#ffc72c"/>
+                <rect x="78" y="116" width="8" height="100" rx="4" fill="#fff" opacity=".25"/>
+            </g>
+        </svg>
+    </div>
+    <div class="road"></div>
+</header>
+
+<div class="ticker" aria-hidden="true"><div><span>★ 5 boroughs ★ 262 neighborhood areas ★ 3 ways to count ★ click any neighborhood ★ hover to highlight ★ </span></div></div>
+
+<!-- ═══════════════════════════ ABOUT ═══════════════════════════ -->
+<section class="about" id="about">
+    <div class="card reveal">
+        <h2>About</h2>
+        <p>This page is part of a project to improve my open-source geospatial analysis and visualization skills.
+            Using data from NYC's open data hub, I decided to analyze the distribution of fire hydrants across NYC's 5 boroughs.
+            Through working on this, I realized there are different ways to normalize the data, hence why you'll see three maps below.</p>
+        <p>Each map is a choropleth, showing a gradient of hydrant density based on a different normalizing variable: neighborhood size, building count, and total building footprint size.
+            By clicking on a neighborhood, you can see pop-ups with more details and specific values. The legend and titles also provide insight.</p>
+        <p>You can read more about the methodology in the corresponding README in the GitHub repo, and sources are linked below.</p>
+    </div>
+</section>
+
+<!-- ═══════════════════ MAP 1: HYDRANTS PER KM² ═══════════════════ -->
+<section class="intro red">
+    <div class="wrap reveal">
+        <div class="bullet">1</div>
+        <div>
+            <h2>Hydrants per km²</h2>
+            <p>In this map, we're using the area of the neighborhood as the normalizing variable to base our hydrant density.</p>
+        </div>
+    </div>
+</section>
+<div class="map-wrapper" id="map-density" style="--c: var(--red)"><div class="map"></div></div>
+
+<!-- ═══════════════════ MAP 2: HYDRANTS PER BUILDING ═══════════════════ -->
+<section class="intro blue">
+    <div class="wrap reveal">
+        <div class="bullet">2</div>
+        <div>
+            <h2>Hydrants per building</h2>
+            <p>In this map, we're using the building count of the neighborhood as the normalizing variable to base our hydrant density.</p>
+        </div>
+    </div>
+</section>
+<div class="map-wrapper" id="map-per-building" style="--c: var(--blue)"><div class="map"></div></div>
+
+<!-- ═══════════════════ MAP 3: HYDRANTS PER KM² OF BUILDINGS ═══════════════════ -->
+<section class="intro purple">
+    <div class="wrap reveal">
+        <div class="bullet">3</div>
+        <div>
+            <h2>Hydrants per km² of building area</h2>
+            <p>In this map, we're using the area of the building footprint in the neighborhood as the normalizing variable to base our hydrant density.</p>
+        </div>
+    </div>
+</section>
+<div class="map-wrapper" id="map-per-building-km2" style="--c: var(--purple)"><div class="map"></div></div>
+
+<!-- ═══════════════════════════ SOURCES ═══════════════════════════ -->
+<section class="sources" id="sources">
+    <div class="wrap reveal">
+        <h2>Sources</h2>
+        <ul>
+            <li><a href="https://data.cityofnewyork.us/Environment/Hydrants/5bgh-vtsn/about_data" target="_blank" rel="noopener">NYC City Hydrants from NYC Open Data</a></li>
+            <li><a href="https://data.cityofnewyork.us/City-Government/2020-Neighborhood-Tabulation-Areas-NTAs-/9nt8-h7nd/about_data" target="_blank" rel="noopener">Neighborhood Boundaries from NYC Open Data</a></li>
+            <li><a href="https://data.cityofnewyork.us/City-Government/BUILDING/5zhs-2jue/about_data" target="_blank" rel="noopener">Building Footprints from NYC Open Data</a></li>
+        </ul>
+    </div>
+</section>
+
+<script>
+    // ── Register the PMTiles protocol once; every map shares it ───────────
+    const protocol = new pmtiles.Protocol();
+    maplibregl.addProtocol('pmtiles', protocol.tile);
+
+    // ── Number formatters used for popups and legends ─────────────────────
+    const int = v => Number(v).toLocaleString();
+    const dec = n => v => Number(v).toFixed(n);
+
+    // ══════════════════════════════════════════════════════════════════════
+    //  MAP SETTINGS — edit breaks, colors, and popup rows here
+    //
+    //  breaks : class cut-offs. 4 breaks = 5 colors.
+    //  colors : light → dark, one more than the number of breaks.
+    //  popup  : [label, tile property, formatter, bold?]
+    // ══════════════════════════════════════════════════════════════════════
+    const MAPS = [
+        {
+            id: 'map-density',
+            file: 'data/processed/hydrant_density.pmtiles',
+            title: 'NYC Hydrant Density',
+            hint: 'Fire hydrants per km² by neighborhood. Click a neighborhood for details.',
+            legendTitle: 'Hydrants per km²',
+            field: 'density_per_km2',
+            breaks: [100, 150, 200, 300],
+            colors: ['#ffffcc', '#fed976', '#fd8d3c', '#e31a1c', '#800026'],   // yellow → red
+            legendFmt: int,
+            popup: [
+                ['Hydrants', 'hydrant_count', int, true],
+                ['Area', 'area_km2', v => dec(2)(v) + ' km²', false],
+                ['Density', 'density_per_km2', v => dec(1)(v) + ' / km²', true]
+            ]
+        },
+        {
+            id: 'map-per-building',
+            file: 'data/processed/hydrant_density_buildings.pmtiles',
+            title: 'Hydrants per Building',
+            hint: 'Average number of hydrants for each building. Click a neighborhood for details.',
+            legendTitle: 'Hydrants per building',
+            field: 'hydrants_per_building',
+            breaks: [0.06, 0.08, 0.10, 0.13],
+            colors: ['#eff3ff', '#bdd7e7', '#6baed6', '#3182bd', '#08519c'],   // light blue → dark blue
+            legendFmt: dec(2),
+            popup: [
+                ['Hydrants', 'hydrant_count', int, false],
+                ['Buildings', 'building_count', int, false],
+                ['Hydrants per building', 'hydrants_per_building', dec(3), true]
+            ]
+        },
+        {
+            id: 'map-per-building-km2',
+            file: 'data/processed/hydrant_density_buildings.pmtiles',
+            title: 'Hydrants per km² of Building Area',
+            hint: 'Hydrants per km² of building area. Click a neighborhood for details.',
+            legendTitle: 'Hydrants per km² of buildings',
+            field: 'hydrants_per_building_km2',
+            breaks: [300, 450, 600, 900],
+            colors: ['#f2f0f7', '#cbc9e2', '#9e9ac8', '#756bb1', '#54278f'],   // light purple → dark purple
+            legendFmt: int,
+            popup: [
+                ['Hydrants', 'hydrant_count', int, false],
+                ['Buildings', 'building_count', int, false],
+                ['Building area', 'building_area_km2', v => dec(3)(v) + ' km²', false],
+                ['Hydrants per km² of buildings', 'hydrants_per_building_km2', v => int(Math.round(v)), true]
+            ]
+        }
+    ];
+
+    // ── Builds the legend labels ("< 100", "100 – 150", ..., "300+") ──────
+    function legendLabels(breaks, fmt) {
+        return [
+            `&lt; ${fmt(breaks[0])}`,
+            ...breaks.slice(1).map((b, i) => `${fmt(breaks[i])} – ${fmt(b)}`),
+            `${fmt(breaks[breaks.length - 1])}+`
+        ];
+    }
+
+    // ── Creates one interactive map from a settings object ────────────────
+    function createMap(cfg) {
+        const wrapper = document.getElementById(cfg.id);
+
+        // Info panel
+        const info = document.createElement('div');
+        info.className = 'info';
+        info.innerHTML = `<h3>${cfg.title}</h3><p>${cfg.hint}</p>`;
+        wrapper.appendChild(info);
+
+        // Legend (built from the same breaks and colors the map uses)
+        const labels = legendLabels(cfg.breaks, cfg.legendFmt);
+        const legend = document.createElement('div');
+        legend.className = 'legend';
+        legend.innerHTML = `<h4>${cfg.legendTitle}</h4>` + cfg.colors.map((color, i) =>
+            `<div class="legend-row"><div class="legend-color" style="background:${color}"></div> ${labels[i]}</div>`
+        ).join('');
+        wrapper.appendChild(legend);
+
+        // Map
+        const map = new maplibregl.Map({
+            container: wrapper.querySelector('.map'),
+            style: 'https://tiles.openfreemap.org/styles/liberty',
+            center: [-73.95, 40.72],  // NYC center
+            zoom: 10.5,
+            maxZoom: 14,
+            minZoom: 8,
+            cooperativeGestures: true  // Ctrl/Cmd + scroll to zoom, so the page can still scroll
+        });
+        map.addControl(new maplibregl.NavigationControl(), 'top-right');
+
+        // 'step' color expression: [ 'step', value, color0, break1, color1, ... ]
+        const fillColor = ['step', ['get', cfg.field], cfg.colors[0]];
+        cfg.breaks.forEach((b, i) => fillColor.push(b, cfg.colors[i + 1]));
+
+        map.on('load', () => {
+            map.addSource('density', {
+                type: 'vector',
+                url: 'pmtiles://' + new URL(cfg.file, window.location.href).href
+            });
+
+            map.addLayer({
+                id: 'density-fill',
+                type: 'fill',
+                source: 'density',
+                'source-layer': 'hydrant_density',
+                paint: { 'fill-color': fillColor, 'fill-opacity': 0.7 }
+            });
+
+            map.addLayer({
+                id: 'density-outline',
+                type: 'line',
+                source: 'density',
+                'source-layer': 'hydrant_density',
+                paint: { 'line-color': '#333', 'line-width': 0.5, 'line-opacity': 0.6 }
+            });
+
+            // Highlight layer — matches nothing until a neighborhood is hovered
+            map.addLayer({
+                id: 'density-highlight',
+                type: 'line',
+                source: 'density',
+                'source-layer': 'hydrant_density',
+                paint: { 'line-color': '#000', 'line-width': 2.5 },
+                filter: ['==', 'ntaname', '']
+            });
+        });
+
+        // Click — popup with neighborhood details
+        map.on('click', 'density-fill', (e) => {
+            if (!e.features || e.features.length === 0) return;
+
+            const p = e.features[0].properties;
+            const rows = cfg.popup.map(([label, key, fmt, bold]) => {
+                const raw = typeof key === 'function' ? key(p) : p[key];
+                const value = fmt(raw);
+                return `${label}: ${bold ? `<strong>${value}</strong>` : value}`;
+            }).join('<br>');
+
+            const html = `
+                <strong>${p.ntaname}</strong><br>
+                ${p.boroname}<br>
+                <hr style="margin:4px 0;border:none;border-top:1px solid #ddd">
+                ${rows}
+            `;
+
+            new maplibregl.Popup({ maxWidth: '260px' })
+                .setLngLat(e.lngLat)
+                .setHTML(html)
+                .addTo(map);
+        });
+
+        // Hover — outline the neighborhood under the cursor
+        map.on('mousemove', 'density-fill', (e) => {
+            map.getCanvas().style.cursor = 'pointer';
+            if (e.features && e.features.length > 0) {
+                map.setFilter('density-highlight', ['==', 'ntaname', e.features[0].properties.ntaname]);
+            }
+        });
+
+        map.on('mouseleave', 'density-fill', () => {
+            map.getCanvas().style.cursor = '';
+            map.setFilter('density-highlight', ['==', 'ntaname', '']);
+        });
+    }
+
+    MAPS.forEach(createMap);
+
+    // ══════════════════ DECORATIVE: skyline, ticker, scroll reveal ══════════════════
+    (function () {
+        // Skyline with randomly twinkling windows (new arrangement on each load)
+        const svg = document.getElementById('skyline'), NS = 'http://www.w3.org/2000/svg', G = 260;
+        const el = (tag, attrs) => {
+            const e = document.createElementNS(NS, tag);
+            for (const k in attrs) e.setAttribute(k, attrs[k]);
+            svg.appendChild(e);
+            return e;
+        };
+        const windows = (x, y, w, h) => {
+            for (let cx = x + 8; cx < x + w - 10; cx += 12)
+                for (let cy = y + 10; cy < y + h - 12; cy += 16)
+                    if (Math.random() < 0.3) {
+                        const r = el('rect', { x: cx, y: cy, width: 5, height: 8, class: 'win' });
+                        r.style.animationDelay = (-Math.random() * 8) + 's';
+                        r.style.animationDuration = (3 + Math.random() * 5) + 's';
+                    }
+        };
+        const building = (x, w, h, fill) => { el('rect', { x, y: G - h, width: w, height: h, fill }); windows(x, G - h, w, h); };
+
+        for (let x = -200; x < 1400;) {
+            const w = 40 + Math.random() * 40;
+            building(x, w, 70 + Math.random() * 120, '#0a1430');
+            x += w + 2;
+        }
+        const L = '#101d44';
+        building(540, 64, 200, L);                                  // Empire State-style tower
+        [[550, 44, 22], [558, 28, 20], [566, 12, 16]].forEach(([x, w, h], i) =>
+            el('rect', { x, y: G - 200 - [22, 42, 58][i], width: w, height: h, fill: L }));
+        el('rect', { x: 570.5, y: G - 300, width: 3, height: 42, fill: L });
+        building(880, 64, 170, L);                                  // Chrysler-style crown
+        el('polygon', { points: '886,90 912,28 938,90', fill: L });
+        el('rect', { x: 910.5, y: -12, width: 3, height: 40, fill: L });
+        building(1120, 56, 190, L);                                 // One WTC-style spire
+        el('polygon', { points: '1120,70 1148,20 1176,70', fill: L });
+        el('rect', { x: 1146.5, y: -60, width: 3, height: 80, fill: L });
+        [[572, -40], [912, -12], [1148, -60]].forEach(([cx, cy]) => el('circle', { cx, cy, r: 2.5, class: 'beacon' }));
+
+        // Ticker: duplicate the text so it loops seamlessly
+        const t = document.querySelector('.ticker div');
+        t.innerHTML += t.innerHTML;
+
+        // Scroll reveal
+        const io = new IntersectionObserver(entries => entries.forEach(e => {
+            if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); }
+        }), { threshold: 0.15 });
+        document.querySelectorAll('.reveal').forEach(n => io.observe(n));
+    })();
+</script>
+
+</body>
+</html>
