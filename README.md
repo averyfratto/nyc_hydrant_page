@@ -1,10 +1,22 @@
 # NYC Hydrant Density Map
 
-🗺️ **[Live map](https://{your-username}.github.io/nyc-hydrant-map/)**
+This project maps fire hydrants across New York City's neighborhoods. Click a neighborhood to see its hydrant count and the values behind its color, and hover to outline it.
 
-A web map showing NYC fire hydrant density by neighborhood. Built on the modern open-source stack (MapLibre + PMTiles + GitHub Pages) for $0/month.
+### Why normalize?
 
-![Screenshot of the choropleth](images/density_choropleth.png)
+A raw hydrant count mostly shows which neighborhoods are big or densely built. To compare neighborhoods fairly, each map divides the hydrant count by a different measure of size.
+
+| Map | Normalizing variable | Formula | What it tells you |
+|---|---|---|---|
+| **Hydrants per km²** | Neighborhood land area | hydrants ÷ neighborhood area (km²) | How tightly hydrants are spread across the ground, regardless of what's built there |
+| **Hydrants per building** | Number of buildings | hydrants ÷ building count | How many hydrants serve each building. This reflects coverage of the things that need protecting. |
+| **Hydrants per km² of building area** | Total building footprint | hydrants ÷ building footprint area (km²) | Hydrants relative to the ground actually covered by buildings. This separates built-up areas from open space. |
+
+### How to read the maps
+
+- Darker colors mean higher values. Each map has its own color scale and legend, so colors aren't comparable across maps.
+- The legend uses fixed class breaks rather than a continuous scale.
+- Parks, cemeteries, and other neighborhoods with few or no buildings can show zero or very high values, especially on the two building-based maps. Treat those as artifacts of the denominator, not as meaningful patterns.
 
 ## The question
 
@@ -14,7 +26,7 @@ Where is hydrant coverage densest in NYC, and which neighborhoods are underserve
 
 - **NYC Neighborhoods.** 262 polygons (Source: [NYC Open Data](https://opendata.cityofnewyork.us))
 - **NYC Fire Hydrants.** 109,725 points (Source: [NYC Open Data](https://opendata.cityofnewyork.us))
-- Density was computed in PP2 ([repo link]) using PostGIS and GeoPandas.
+- **NYC Building Footprints.** 1.08 M points (Source: https://data.cityofnewyork.us/City-Government/BUILDING/5zhs-2jue/about_data)
 
 ## The technology choices
 
